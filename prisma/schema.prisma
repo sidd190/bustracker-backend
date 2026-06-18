@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  buses     Bus[]
+  users     User[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(STUDENT)
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  driver    Driver?
+  createdAt DateTime @default(now())
+}
+
+model Driver {
+  id        String       @id @default(cuid())
+  userId    String       @unique
+  user      User         @relation(fields: [userId], references: [id])
+  busId     String?      @unique
+  bus       Bus?         @relation(fields: [busId], references: [id])
+  status    DriverStatus @default(OFF_DUTY)
+  routeId   String?
+  route     Route?       @relation(fields: [routeId], references: [id])
+  updatedAt DateTime     @updatedAt
+}
+
+model Bus {
+  id        String   @id @default(cuid())
+  name      String
+  number    String   // e.g. "BV-01"
+  capacity  Int      @default(50)
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  driver    Driver?
+  lat       Float?
+  lng       Float?
+  heading   Float?   // direction in degrees
+  speed     Float?   // km/h
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model Route {
+  id          String   @id @default(cuid())
+  name        String   // "Market Route", "Hostel Route", "Niwai Route"
+  shortName   String   // "MKT", "HST", "NWI"
+  color       String   // hex color for map polyline
+  description String
+  stops       Stop[]
+  schedules   Schedule[]
+  drivers     Driver[]
+  createdAt   DateTime @default(now())
+}
+
+model Stop {
+  id        String   @id @default(cuid())
+  name      String
+  lat       Float
+  lng       Float
+  order     Int
+  routeId   String
+  route     Route    @relation(fields: [routeId], references: [id])
+}
+
+model Schedule {
+  id        String   @id @default(cuid())
+  routeId   String
+  route     Route    @relation(fields: [routeId], references: [id])
+  startTime String   // "07:50"
+  endTime   String   // "19:15"
+  interval  Int      // minutes between rounds
+  days      String   @default("MON,TUE,WED,THU,FRI,SAT") // comma-separated
+}
+
+enum Role {
+  STUDENT
+  DRIVER
+}
+
+enum DriverStatus {
+  ON_DUTY
+  ON_BREAK
+  OFF_DUTY
+}
