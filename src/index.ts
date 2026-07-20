@@ -32,5 +32,13 @@ registerSocketHandlers(io);
 
 const PORT = process.env.PORT || 3001;
 server.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`🚌 BusTracker backend running on http://0.0.0.0:${PORT}`);
+  console.log(`🚌 TraqBus backend running on http://0.0.0.0:${PORT}`);
+
+  // Keep Render free tier awake — ping own health endpoint every 13 min
+  const selfUrl = process.env.RENDER_EXTERNAL_URL;
+  if (selfUrl) {
+    setInterval(() => {
+      fetch(`${selfUrl}/health`).catch(() => {});
+    }, 13 * 60 * 1000);
+  }
 });
