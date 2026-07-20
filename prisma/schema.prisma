@@ -16,14 +16,23 @@ model School {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
-  email     String   @unique
+  email     String     @unique
   password  String
-  role      Role     @default(STUDENT)
+  role      Role       @default(STUDENT)
   schoolId  String
-  school    School   @relation(fields: [schoolId], references: [id])
+  school    School     @relation(fields: [schoolId], references: [id])
   driver    Driver?
+  feedbacks Feedback[]
+  createdAt DateTime   @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  message   String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
 }
 

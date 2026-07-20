@@ -63,6 +63,16 @@ router.post('/assign', authenticate, async (req: AuthRequest, res: Response) => 
   return res.json(driver);
 });
 
+// Driver unassigns from bus (on logout)
+router.post('/unassign', authenticate, async (req: AuthRequest, res: Response) => {
+  if (req.user!.role !== 'DRIVER') return res.status(403).json({ error: 'Forbidden' });
+  await prisma.driver.update({
+    where: { userId: req.user!.id },
+    data: { busId: null, routeId: null, status: 'OFF_DUTY' },
+  });
+  return res.json({ success: true });
+});
+
 // Driver updates status
 router.patch('/driver/status', authenticate, async (req: AuthRequest, res: Response) => {
   if (req.user!.role !== 'DRIVER') return res.status(403).json({ error: 'Forbidden' });

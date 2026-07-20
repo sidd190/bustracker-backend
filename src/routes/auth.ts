@@ -7,7 +7,7 @@ const router = Router();
 const prisma = new PrismaClient();
 
 router.post('/register', async (req: Request, res: Response) => {
-  const { name, email, password, role, schoolId } = req.body;
+  const { name, email, password, schoolId } = req.body;
   if (!name || !email || !password || !schoolId)
     return res.status(400).json({ error: 'Missing required fields' });
 
@@ -20,19 +20,16 @@ router.post('/register', async (req: Request, res: Response) => {
         name,
         email,
         password: await bcrypt.hash(password, 10),
-        role: role === 'DRIVER' ? 'DRIVER' : 'STUDENT',
+        role: 'STUDENT',
         schoolId,
       },
     });
-    if (user.role === 'DRIVER') {
-      await prisma.driver.create({ data: { userId: user.id } });
-    }
     const token = jwt.sign(
       { id: user.id, role: user.role, schoolId: user.schoolId },
       process.env.JWT_SECRET!,
       { expiresIn: '30d' }
     );
-    return res.json({ token, user: { id: user.id, name: user.name, role: user.role } });
+    return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (e: any) {
     if (e.code === 'P2002') return res.status(409).json({ error: 'Email already registered' });
     return res.status(500).json({ error: 'Server error' });
@@ -50,7 +47,32 @@ router.post('/login', async (req: Request, res: Response) => {
     process.env.JWT_SECRET!,
     { expiresIn: '30d' }
   );
-  return res.json({ token, user: { id: user.id, name: user.name, role: user.role } });
+  return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+});
+
+router.post('/driver-login', async (req: Request, res: Response) => {
+  const { password } = req.body;
+  if (!password) return res.status(400).json({ error: 'Password required' });
+
+  const drivers = await prisma.user.findMany({
+    where: { role: 'DRIVER' },
+    include: { driver: true },
+  });
+
+  if (drivers.length === 0)
+    return res.status(404).json({ error: 'No driver accounts configured' });
+
+  const valid = await bcrypt.compare(password, drivers[0].password);
+  if (!valid) return res.status(401).json({ error: 'Invalid password' });
+
+  const available = drivers.find(d => !d.driver?.busId) ?? drivers[0];
+
+  const token = jwt.sign(
+    { id: available.id, role: 'DRIVER', schoolId: available.schoolId },
+    process.env.JWT_SECRET!,
+    { expiresIn: '12h' }
+  );
+  return res.json({ token, user: { id: available.id, name: available.name, role: 'DRIVER' } });
 });
 
 export default router;

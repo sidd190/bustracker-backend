@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { Server } from 'socket.io';
 import authRoutes from './routes/auth';
 import busRoutes from './routes/bus';
+import feedbackRoutes from './routes/feedback';
 import { registerSocketHandlers } from './socket/handler';
 
 dotenv.config();
@@ -24,6 +25,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/buses', busRoutes);
+app.use('/api/feedback', feedbackRoutes);
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
 registerSocketHandlers(io);
