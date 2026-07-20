@@ -71,7 +71,7 @@ async function main() {
   for (let i = 1; i <= 5; i++) {
     const user = await prisma.user.upsert({
       where: { email: `driver${i}@banasthali.ac.in` },
-      update: {},
+      update: { password: driverPassword },
       create: {
         name: `Driver ${i}`,
         email: `driver${i}@banasthali.ac.in`,

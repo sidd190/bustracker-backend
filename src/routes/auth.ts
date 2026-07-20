@@ -62,8 +62,11 @@ router.post('/driver-login', async (req: Request, res: Response) => {
   if (drivers.length === 0)
     return res.status(404).json({ error: 'No driver accounts configured' });
 
-  const valid = await bcrypt.compare(password, drivers[0].password);
-  if (!valid) return res.status(401).json({ error: 'Invalid password' });
+  let matched = false;
+  for (const d of drivers) {
+    if (await bcrypt.compare(password, d.password)) { matched = true; break; }
+  }
+  if (!matched) return res.status(401).json({ error: 'Invalid password' });
 
   const available = drivers.find(d => !d.driver?.busId) ?? drivers[0];
 
