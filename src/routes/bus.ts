@@ -133,5 +133,28 @@ export default function createBusRoutes(io: Server) {
     return res.json({ success: true });
   });
 
+  // Admin cleanup — delete extra buses, unassign all drivers
+  router.post('/admin/cleanup', async (req: any, res: Response) => {
+    const { secret } = req.body;
+    if (secret !== process.env.JWT_SECRET) return res.status(403).json({ error: 'Forbidden' });
+
+    await prisma.driver.updateMany({
+      data: { busId: null, routeId: null, status: 'OFF_DUTY' },
+    });
+
+    const KEEP_NUMBERS = ['1401', '1399', '1400', '1314', '1317'];
+    const keepBuses = await prisma.bus.findMany({
+      where: { number: { in: KEEP_NUMBERS } },
+      select: { id: true },
+    });
+    const keepIds = keepBuses.map((b: any) => b.id);
+
+    const deleted = await prisma.bus.deleteMany({
+      where: { id: { notIn: keepIds } },
+    });
+
+    res.json({ driversReset: true, busesDeleted: deleted.count, busesKept: keepIds.length });
+  });
+
   return router;
 }
