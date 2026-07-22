@@ -4,7 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { Server } from 'socket.io';
 import authRoutes from './routes/auth';
-import busRoutes from './routes/bus';
+import createBusRoutes from './routes/bus';
 import feedbackRoutes from './routes/feedback';
 import { registerSocketHandlers } from './socket/handler';
 
@@ -15,7 +15,6 @@ const server = http.createServer(app);
 
 export const io = new Server(server, {
   cors: { origin: '*' },
-  // Tune for 1000 concurrent connections
   pingTimeout: 60000,
   pingInterval: 25000,
 });
@@ -24,7 +23,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
-app.use('/api/buses', busRoutes);
+app.use('/api/buses', createBusRoutes(io));
 app.use('/api/feedback', feedbackRoutes);
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 

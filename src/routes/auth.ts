@@ -50,6 +50,7 @@ router.post('/login', async (req: Request, res: Response) => {
   return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 });
 
+// Legacy shared-password login (kept for backward compat)
 router.post('/driver-login', async (req: Request, res: Response) => {
   const { password } = req.body;
   if (!password) return res.status(400).json({ error: 'Password required' });
@@ -76,6 +77,62 @@ router.post('/driver-login', async (req: Request, res: Response) => {
     { expiresIn: '12h' }
   );
   return res.json({ token, user: { id: available.id, name: available.name, role: 'DRIVER' } });
+});
+
+// New: claim a bus with PIN — combines login + assign in one step
+router.post('/claim-bus', async (req: Request, res: Response) => {
+  const { busNumber, pin } = req.body;
+  if (!busNumber || !pin)
+    return res.status(400).json({ error: 'Bus number and PIN required' });
+
+  const bus = await prisma.bus.findFirst({ where: { number: busNumber } });
+  if (!bus) return res.status(404).json({ error: 'Bus not found' });
+
+  const driverUsers = await prisma.user.findMany({
+    where: { role: 'DRIVER', schoolId: bus.schoolId },
+    include: { driver: true },
+  });
+  if (!driverUsers.length)
+    return res.status(404).json({ error: 'No driver accounts configured' });
+
+  let pinValid = false;
+  for (const d of driverUsers) {
+    if (await bcrypt.compare(pin, d.password)) { pinValid = true; break; }
+  }
+  if (!pinValid) return res.status(401).json({ error: 'Invalid PIN' });
+
+  // Last-claim-wins: unassign whoever currently has this bus
+  await prisma.driver.updateMany({
+    where: { busId: bus.id },
+    data: { busId: null, routeId: null, status: 'OFF_DUTY' },
+  });
+
+  // Pick an available driver account (one without a bus)
+  const freshDrivers = await prisma.driver.findMany({
+    where: { user: { schoolId: bus.schoolId }, busId: null },
+    include: { user: true },
+  });
+  const driverRecord = freshDrivers[0];
+  if (!driverRecord)
+    return res.status(500).json({ error: 'No available driver slots' });
+
+  const route = await prisma.route.findFirst();
+  await prisma.driver.update({
+    where: { id: driverRecord.id },
+    data: { busId: bus.id, routeId: route?.id ?? null },
+  });
+
+  const token = jwt.sign(
+    { id: driverRecord.userId, role: 'DRIVER', schoolId: bus.schoolId },
+    process.env.JWT_SECRET!,
+    { expiresIn: '12h' }
+  );
+
+  return res.json({
+    token,
+    user: { id: driverRecord.userId, name: driverRecord.user.name, role: 'DRIVER' },
+    bus: { id: bus.id, name: bus.name, number: bus.number },
+  });
 });
 
 export default router;
