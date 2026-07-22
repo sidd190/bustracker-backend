@@ -153,7 +153,17 @@ export default function createBusRoutes(io: Server) {
       where: { id: { notIn: keepIds } },
     });
 
-    res.json({ driversReset: true, busesDeleted: deleted.count, busesKept: keepIds.length });
+    const drivers = await prisma.driver.findMany({
+      select: { id: true, userId: true },
+    });
+    for (let i = 0; i < drivers.length; i++) {
+      await prisma.user.update({
+        where: { id: drivers[i].userId },
+        data: { name: `Driver ${i + 1}` },
+      });
+    }
+
+    res.json({ driversReset: true, busesDeleted: deleted.count, busesKept: keepIds.length, driversRenamed: drivers.length });
   });
 
   return router;
