@@ -11,6 +11,9 @@ router.post('/register', async (req: Request, res: Response) => {
   if (!name || !email || !password || !schoolId)
     return res.status(400).json({ error: 'Missing required fields' });
 
+  if (!email.toLowerCase().endsWith('@banasthali.in'))
+    return res.status(400).json({ error: 'Only Banasthali student emails (@banasthali.in) are allowed' });
+
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
   if (!school) return res.status(404).json({ error: 'School not found' });
 
