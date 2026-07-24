@@ -64,9 +64,9 @@ async function main() {
     });
   }
 
-  // ── Driver Users (common password: BVdriver2024) ──────────────────────
+  // ── Driver Users (common PIN: 1935) ──────────────────────
   const pw = async (p: string) => bcrypt.hash(p, 10);
-  const driverPassword = await pw('BVdriver2024');
+  const driverPassword = await pw('1935');
 
   for (let i = 1; i <= 5; i++) {
     const user = await prisma.user.upsert({

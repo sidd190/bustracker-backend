@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import { Server } from 'socket.io';
 import { authenticate, AuthRequest } from '../middleware/auth';
 
@@ -163,7 +164,15 @@ export default function createBusRoutes(io: Server) {
       });
     }
 
-    res.json({ driversReset: true, busesDeleted: deleted.count, busesKept: keepIds.length, driversRenamed: drivers.length });
+    if (req.body.newPin) {
+      const hash = await bcrypt.hash(req.body.newPin, 10);
+      await prisma.user.updateMany({
+        where: { role: 'DRIVER' },
+        data: { password: hash },
+      });
+    }
+
+    res.json({ driversReset: true, busesDeleted: deleted.count, busesKept: keepIds.length, driversRenamed: drivers.length, pinChanged: !!req.body.newPin });
   });
 
   return router;
