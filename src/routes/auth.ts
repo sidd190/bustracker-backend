@@ -102,16 +102,28 @@ router.post('/claim-bus', async (req: Request, res: Response) => {
   if (!pinValid) return res.status(401).json({ error: 'Invalid PIN' });
 
   // Last-claim-wins: unassign whoever currently has this bus
+  const previousHolders = await prisma.driver.findMany({
+    where: { busId: bus.id },
+    select: { id: true },
+  });
+  const previousIds = previousHolders.map(d => d.id);
+
   await prisma.driver.updateMany({
     where: { busId: bus.id },
     data: { busId: null, routeId: null, status: 'OFF_DUTY' },
   });
 
-  // Pick an available driver account (one without a bus)
-  const freshDrivers = await prisma.driver.findMany({
-    where: { user: { schoolId: bus.schoolId }, busId: null },
+  // Pick a different driver account so the old JWT becomes invalid
+  let freshDrivers = await prisma.driver.findMany({
+    where: { user: { schoolId: bus.schoolId }, busId: null, id: { notIn: previousIds } },
     include: { user: true },
   });
+  if (!freshDrivers.length) {
+    freshDrivers = await prisma.driver.findMany({
+      where: { user: { schoolId: bus.schoolId }, busId: null },
+      include: { user: true },
+    });
+  }
   const driverRecord = freshDrivers[0];
   if (!driverRecord)
     return res.status(500).json({ error: 'No available driver slots' });
