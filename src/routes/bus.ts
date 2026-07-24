@@ -102,6 +102,14 @@ export default function createBusRoutes(io: Server) {
     if (req.user!.role !== 'DRIVER') return res.status(403).json({ error: 'Forbidden' });
     const { busId, lat, lng, heading, speed } = req.body;
 
+    const driver = await prisma.driver.findUnique({
+      where: { userId: req.user!.id },
+      select: { busId: true },
+    });
+    if (!driver || driver.busId !== busId) {
+      return res.status(403).json({ error: 'NOT_ASSIGNED' });
+    }
+
     await prisma.bus.update({
       where: { id: busId },
       data: { lat, lng, heading, speed },
