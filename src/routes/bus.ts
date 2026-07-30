@@ -76,13 +76,28 @@ export default function createBusRoutes(io: Server) {
     return res.json(driver);
   });
 
-  // Driver unassigns from bus (end shift)
+  // Driver unassigns from bus (end shift). Releases the bus AND wipes its last
+  // position so no ghost location lingers for the next driver / student map.
   router.post('/unassign', authenticate, async (req: AuthRequest, res: Response) => {
     if (req.user!.role !== 'DRIVER') return res.status(403).json({ error: 'Forbidden' });
+
+    const driver = await prisma.driver.findUnique({
+      where: { userId: req.user!.id },
+      select: { busId: true },
+    });
+
     await prisma.driver.update({
       where: { userId: req.user!.id },
       data: { busId: null, routeId: null, status: 'OFF_DUTY' },
     });
+
+    if (driver?.busId) {
+      await prisma.bus.update({
+        where: { id: driver.busId },
+        data: { lat: null, lng: null, speed: null, heading: null },
+      });
+    }
+
     return res.json({ success: true });
   });
 
