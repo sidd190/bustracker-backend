@@ -23,30 +23,11 @@ export function registerSocketHandlers(io: Server) {
     const user = (socket as any).user as TokenPayload;
     socket.join(`school:${user.schoolId}`);
 
-    // Driver sends location update
-    socket.on('driver:location', async (data: {
+    // Driver sends location update — broadcast immediately, persist async
+    socket.on('driver:location', (data: {
       busId: string; lat: number; lng: number; heading?: number; speed?: number;
     }) => {
       if (user.role !== 'DRIVER') return;
-
-      await prisma.bus.update({
-        where: { id: data.busId },
-        data: { lat: data.lat, lng: data.lng, heading: data.heading, speed: data.speed },
-      });
-
-      const bus = await prisma.bus.findUnique({
-        where: { id: data.busId },
-        select: {
-          name: true, number: true,
-          driver: {
-            select: {
-              status: true,
-              user: { select: { name: true } },
-              route: { select: { id: true, name: true, shortName: true, color: true } },
-            },
-          },
-        },
-      });
 
       io.to(`school:${user.schoolId}`).emit('bus:location', {
         busId: data.busId,
@@ -55,12 +36,12 @@ export function registerSocketHandlers(io: Server) {
         heading: data.heading,
         speed: data.speed,
         timestamp: Date.now(),
-        name: bus?.name,
-        number: bus?.number,
-        driverName: bus?.driver?.user?.name,
-        status: bus?.driver?.status,
-        route: bus?.driver?.route,
       });
+
+      prisma.bus.update({
+        where: { id: data.busId },
+        data: { lat: data.lat, lng: data.lng, heading: data.heading, speed: data.speed },
+      }).catch(() => {});
     });
 
     // Driver updates status
@@ -88,6 +69,5 @@ export function registerSocketHandlers(io: Server) {
       }
     });
 
-    socket.on('disconnect', () => {});
   });
 }

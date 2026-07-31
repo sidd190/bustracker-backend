@@ -112,7 +112,7 @@ export default function createBusRoutes(io: Server) {
     return res.json(driver);
   });
 
-  // Location update via HTTP (for background tracking when socket unavailable)
+  // Location update via HTTP (background tracking fallback when socket unavailable)
   router.post('/location', authenticate, async (req: AuthRequest, res: Response) => {
     if (req.user!.role !== 'DRIVER') return res.status(403).json({ error: 'Forbidden' });
     const { busId, lat, lng, heading, speed } = req.body;
@@ -125,34 +125,17 @@ export default function createBusRoutes(io: Server) {
       return res.status(403).json({ error: 'NOT_ASSIGNED' });
     }
 
-    await prisma.bus.update({
-      where: { id: busId },
-      data: { lat, lng, heading, speed },
-    });
-
-    const bus = await prisma.bus.findUnique({
-      where: { id: busId },
-      select: {
-        name: true, number: true,
-        driver: {
-          select: {
-            status: true,
-            user: { select: { name: true } },
-            route: { select: { id: true, name: true, shortName: true, color: true } },
-          },
-        },
-      },
-    });
-
+    // Broadcast immediately — no DB round-trip in the hot path
     io.to(`school:${req.user!.schoolId}`).emit('bus:location', {
       busId, lat, lng, heading, speed,
       timestamp: Date.now(),
-      name: bus?.name,
-      number: bus?.number,
-      driverName: bus?.driver?.user?.name,
-      status: bus?.driver?.status,
-      route: bus?.driver?.route,
     });
+
+    // Persist asynchronously
+    prisma.bus.update({
+      where: { id: busId },
+      data: { lat, lng, heading, speed },
+    }).catch(() => {});
 
     return res.json({ success: true });
   });
