@@ -133,6 +133,12 @@ export async function fetchCurrentData(
     const res = await fetch(url, { signal: ctrl.signal });
     if (!res.ok) throw new Error(`Fleettrack HTTP ${res.status}`);
     const body = await res.json();
+    // Errors come back as HTTP 200 with an error body, e.g. rate limiting:
+    // {"response":429,"message":"... one API request every 30 seconds ..."}.
+    if (body && typeof body === 'object' && !Array.isArray(body) &&
+        typeof (body as any).response === 'number' && (body as any).response !== 200) {
+      throw new Error(`Fleettrack API ${(body as any).response}: ${(body as any).message ?? 'error'}`);
+    }
     return extractList(body)
       .map(normalize)
       .filter((s): s is GpsState => s !== null);

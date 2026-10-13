@@ -14,7 +14,9 @@ import { fetchCurrentData, getFleettrackConfig, GpsState } from './fleettrack';
 
 const prisma = new PrismaClient();
 
-const POLL_MS = Number(process.env.FLEETTRACK_POLL_MS || 15000);
+// Fleettrack rate-limits to one request per 30s, so never poll faster than
+// that regardless of configuration (going under gets every request 429'd).
+const POLL_MS = Math.max(31000, Number(process.env.FLEETTRACK_POLL_MS || 35000));
 // Pilot aid: when true, parked/ignition-off buses still show on the map so you
 // can verify tracking without the bus moving. Leave off in production.
 const SHOW_PARKED = process.env.FLEETTRACK_SHOW_PARKED === 'true';
