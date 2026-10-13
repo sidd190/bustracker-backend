@@ -9,10 +9,22 @@ const prisma = new PrismaClient();
 export default function createBusRoutes(io: Server) {
   const router = Router();
 
-  // All buses with assigned drivers for this school
+  // Buses visible to students: those with an assigned driver, OR those tracked
+  // by a GPS device that has reported in-service recently. Each bus carries a
+  // computed `status` — the driver's manual status wins; otherwise a live GPS
+  // bus is ON_DUTY (the freshness gate already excludes parked/stale ones).
   router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
+    const staleMs = Number(process.env.FLEETTRACK_STALE_MS || 90000);
+    const freshSince = new Date(Date.now() - staleMs);
+
     const buses = await prisma.bus.findMany({
-      where: { schoolId: req.user!.schoolId, driver: { isNot: null } },
+      where: {
+        schoolId: req.user!.schoolId,
+        OR: [
+          { driver: { isNot: null } },
+          { gpsDeviceId: { not: null }, gpsLastSeen: { gt: freshSince } },
+        ],
+      },
       include: {
         driver: {
           select: {
@@ -23,7 +35,12 @@ export default function createBusRoutes(io: Server) {
         },
       },
     });
-    return res.json(buses);
+
+    const withStatus = buses.map((bus) => ({
+      ...bus,
+      status: bus.driver?.status ?? 'ON_DUTY', // driver-less here ⇒ live GPS
+    }));
+    return res.json(withStatus);
   });
 
   // All buses (for driver bus picker)

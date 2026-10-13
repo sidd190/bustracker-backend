@@ -7,6 +7,7 @@ import authRoutes from './routes/auth';
 import createBusRoutes from './routes/bus';
 import feedbackRoutes from './routes/feedback';
 import { registerSocketHandlers } from './socket/handler';
+import { startGpsPoller } from './services/gpsPoller';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
 
 registerSocketHandlers(io);
+startGpsPoller(io);
 
 const PORT = process.env.PORT || 3001;
 server.listen(Number(PORT), '0.0.0.0', () => {

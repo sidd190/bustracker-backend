@@ -14,3 +14,8 @@ services:
         value: 3001
       - key: NODE_ENV
         value: production
+      # Fleettrack GPS — set TOKEN/EMAIL in the dashboard to activate the poller.
+      - key: FLEETTRACK_TOKEN
+        sync: false
+      - key: FLEETTRACK_EMAIL
+        sync: false

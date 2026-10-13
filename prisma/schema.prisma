@@ -60,6 +60,11 @@ model Bus {
   lng       Float?
   heading   Float?   // direction in degrees
   speed     Float?   // km/h
+  // Fleettrack GPS hardware link. gpsDeviceId is the device/IMEI reported by the
+  // Fleettrack pull API; gpsLastSeen is bumped each poll while the device is in
+  // service, and gates whether a driver-less bus shows on the student map.
+  gpsDeviceId String?   @unique
+  gpsLastSeen DateTime?
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }
