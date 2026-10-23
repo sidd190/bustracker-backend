@@ -38,7 +38,9 @@ export default function createBusRoutes(io: Server) {
 
     const withStatus = buses.map((bus) => ({
       ...bus,
-      status: bus.driver?.status ?? 'ON_DUTY', // driver-less here ⇒ live GPS
+      // Driver status wins; otherwise the GPS-derived status (On Route / On
+      // Break) persisted by the poller, reflecting the device's real state.
+      status: bus.driver?.status ?? bus.gpsStatus ?? 'ON_DUTY',
     }));
     return res.json(withStatus);
   });

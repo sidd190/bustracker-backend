@@ -65,6 +65,7 @@ model Bus {
   // service, and gates whether a driver-less bus shows on the student map.
   gpsDeviceId String?   @unique
   gpsLastSeen DateTime?
+  gpsStatus   String?   // last GPS-derived status for driver-less buses: ON_DUTY | ON_BREAK | OFF_DUTY
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }

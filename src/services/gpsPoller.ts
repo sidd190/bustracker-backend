@@ -16,7 +16,7 @@ const prisma = new PrismaClient();
 
 // Fleettrack rate-limits to one request per 30s, so never poll faster than
 // that regardless of configuration (going under gets every request 429'd).
-const POLL_MS = Math.max(31000, Number(process.env.FLEETTRACK_POLL_MS || 35000));
+const POLL_MS = Math.max(31000, Number(process.env.FLEETTRACK_POLL_MS || 32000));
 // Pilot aid: when true, parked/ignition-off buses still show on the map so you
 // can verify tracking without the bus moving. Leave off in production.
 const SHOW_PARKED = process.env.FLEETTRACK_SHOW_PARKED === 'true';
@@ -63,10 +63,18 @@ async function tick(io: Server) {
       byRegNo.get(bus.number);
     if (!s) continue;
 
-    // A manually-assigned driver's status governs; GPS only decides status for
-    // driver-less buses. This keeps the live emit in sync with GET /buses.
-    const active = s.inService || SHOW_PARKED;
-    const status = bus.driver?.status ?? (active ? 'ON_DUTY' : 'OFF_DUTY');
+    // Reflect the device honestly: moving/ignition-on = On Route, parked but
+    // kept visible (SHOW_PARKED) = On Break, otherwise hidden. A manually
+    // assigned driver's status still wins. gpsStatus is persisted so the live
+    // emit and GET /buses agree.
+    const visible = s.inService || SHOW_PARKED;
+    const gpsStatus = s.inService ? 'ON_DUTY' : visible ? 'ON_BREAK' : 'OFF_DUTY';
+    const status = bus.driver?.status ?? gpsStatus;
+
+    // Stamp with our receipt time (like the driver path), not the device fix
+    // time — a parked device freezes its own timestamp, which makes the app's
+    // "last seen" drift and look laggy.
+    const now = Date.now();
 
     // Broadcast first — keep the DB out of the hot path.
     io.to(`school:${bus.schoolId}`).emit('bus:location', {
@@ -79,11 +87,11 @@ async function tick(io: Server) {
       speed: s.speed,
       status,
       source: 'gps',
-      timestamp: s.reportedAt.getTime(),
+      timestamp: now,
     });
 
-    // Persist position always; bump gpsLastSeen only while in service so the
-    // GET /buses freshness gate hides buses parked at the depot.
+    // Persist position + status always; bump gpsLastSeen only while visible so
+    // the GET /buses freshness gate hides buses parked out of service.
     prisma.bus
       .update({
         where: { id: bus.id },
@@ -92,7 +100,8 @@ async function tick(io: Server) {
           lng: s.lng,
           heading: s.heading,
           speed: s.speed,
-          ...(active ? { gpsLastSeen: s.reportedAt } : {}),
+          gpsStatus,
+          ...(visible ? { gpsLastSeen: new Date(now) } : {}),
         },
       })
       .catch(() => {});
