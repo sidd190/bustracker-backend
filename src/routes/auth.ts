@@ -9,8 +9,11 @@ const prisma = new PrismaClient();
 // Students must sign up / sign in with a Banasthali email. Drivers use the
 // PIN-based endpoints below and are unaffected.
 const STUDENT_EMAIL_DOMAINS = ['banasthali.in', 'banasthali.ac.in'];
+// Specific non-domain emails kept as exceptions (e.g. the owner's test login).
+const STUDENT_EMAIL_ALLOWLIST = ['csinghal20062006@gmail.com'];
 function isStudentEmail(email: string): boolean {
   const at = String(email).trim().toLowerCase();
+  if (STUDENT_EMAIL_ALLOWLIST.includes(at)) return true;
   const i = at.lastIndexOf('@');
   return i !== -1 && STUDENT_EMAIL_DOMAINS.includes(at.slice(i + 1));
 }
