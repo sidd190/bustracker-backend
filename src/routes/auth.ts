@@ -6,10 +6,22 @@ import { PrismaClient } from '@prisma/client';
 const router = Router();
 const prisma = new PrismaClient();
 
+// Students must sign up / sign in with a Banasthali email. Drivers use the
+// PIN-based endpoints below and are unaffected.
+const STUDENT_EMAIL_DOMAINS = ['banasthali.in', 'banasthali.ac.in'];
+function isStudentEmail(email: string): boolean {
+  const at = String(email).trim().toLowerCase();
+  const i = at.lastIndexOf('@');
+  return i !== -1 && STUDENT_EMAIL_DOMAINS.includes(at.slice(i + 1));
+}
+const EMAIL_DOMAIN_ERROR = 'Please use your Banasthali email (@banasthali.in).';
+
 router.post('/register', async (req: Request, res: Response) => {
   const { name, email, password, schoolId } = req.body;
   if (!name || !email || !password || !schoolId)
     return res.status(400).json({ error: 'Missing required fields' });
+  if (!isStudentEmail(email))
+    return res.status(400).json({ error: EMAIL_DOMAIN_ERROR });
 
   const school = await prisma.school.findUnique({ where: { id: schoolId } });
   if (!school) return res.status(404).json({ error: 'School not found' });
@@ -38,6 +50,8 @@ router.post('/register', async (req: Request, res: Response) => {
 
 router.post('/login', async (req: Request, res: Response) => {
   const { email, password } = req.body;
+  if (!isStudentEmail(email))
+    return res.status(400).json({ error: EMAIL_DOMAIN_ERROR });
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !(await bcrypt.compare(password, user.password)))
     return res.status(401).json({ error: 'Invalid credentials' });
